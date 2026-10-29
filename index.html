@@ -53,7 +53,7 @@ tr.me{background:rgba(224,69,123,.22);font-weight:bold}
 <input id="nm" maxlength="14" placeholder="Escribe tu nombre" autocomplete="off">
 <canvas id="pv" width="200" height="220"></canvas>
 <button id="play" class="big">¡Al skatepark!</button>
-<p class="hint">Tienes 3 vidas: cada caída te quita una. Salta rampas, desliza fierros y has 360 o agarra el patin en el aire. Aterriza limpio para cobrar la linea!</p>
+<p class="hint">Tienes 3 vidas: cada caída te quita una. Salta rampas, grindea fierros y gira o agarra en el aire. Aterriza limpio para cobrar el combo.</p>
 </div></div>
 <div id="over" class="ov hide"><div class="card">
 <h2 id="wtxt"></h2><p id="stxt"></p>
@@ -145,6 +145,29 @@ const SFX={jump(){tone(280,640,.12,'square',.11)},land(){tone(140,70,.07,'triang
  grind(){tone(1800+Math.random()*600,800,.05,'sawtooth',.05)},bank(){[523,659,784,1047].forEach((f,i)=>tone(f,f*1.01,.12,'square',.11,i*.07))},
  bail(){tone(200,35,.4,'sawtooth',.22);tone(90,40,.3,'square',.14,.05)},click(){tone(440,660,.06,'square',.08)},end(){[784,659,523,392].forEach((f,i)=>tone(f,f,.16,'square',.11,i*.12))}};
 function initAudio(){try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume()}catch(e){}}
+
+// ---------- Música de fondo estilo skate-punk (sintetizada, se repite en bucle) ----------
+let MG,NB2,musicT=0,musicStep=0;
+const STEP=60/172/2,ROOTS=[110,130.8,146.8,164.8];
+const LEAD=[[659.3,0,587.3,659.3,784,0,659.3,587.3],[523.3,0,587.3,523.3,659.3,0,587.3,523.3],[587.3,0,659.3,587.3,784,0,880,784],[659.3,0,587.3,523.3,587.3,0,440,0]];
+function mbus(){if(!MG){MG=AC.createGain();MG.gain.value=.3;MG.connect(AC.destination);const n=AC.sampleRate;NB2=AC.createBuffer(1,n,AC.sampleRate);const d=NB2.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1}return MG}
+function mOsc(type,f,t,d,v,f2,dest){const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(dest||mbus());o.start(t);o.stop(t+d+.02)}
+function mNoise(t,d,v,type,f){const s=AC.createBufferSource();s.buffer=NB2;const fl=AC.createBiquadFilter();fl.type=type;fl.frequency.value=f;const g=AC.createGain();g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);s.connect(fl);fl.connect(g);g.connect(mbus());s.start(t,Math.random(),d+.02)}
+function mGuitar(f,t,d,v){const fl=AC.createBiquadFilter();fl.type='lowpass';fl.frequency.value=2200;fl.connect(mbus());for(const m of[1,1.5,2])mOsc('sawtooth',f*m,t,d,v,0,fl)}
+function playStep(s,t){
+ const bar=Math.floor(s/8)%4,i=s%8,r=ROOTS[bar];
+ if(i===0||i===3||i===4)mOsc('sine',160,t,.13,.9,45);
+ if(i===2||i===6){mNoise(t,.14,.5,'bandpass',1900);mOsc('triangle',210,t,.1,.3,120)}
+ mNoise(t,i===7?.12:.04,i===7?.2:.12,'highpass',7000);
+ mOsc('triangle',(r/2)*(i%4===3?2:1),t,STEP*.9,.55);
+ mGuitar(r,t,i%2===0?STEP*.9:STEP*.45,i%2===0?.12:.08);
+ const l=LEAD[bar][i];if(l)mOsc('square',l,t,STEP*.85,.06)}
+function musicTick(){
+ if(!AC||muted||state!=='play'||AC.state!=='running'){musicT=0;if(state!=='play')musicStep=0;return}
+ const now=AC.currentTime;if(musicT<now)musicT=now+.05;
+ while(musicT<now+.3){playStep(musicStep,musicT);musicT+=STEP;musicStep=(musicStep+1)%32}}
+setInterval(musicTick,60);
+document.addEventListener('visibilitychange',()=>{if(AC)document.hidden?AC.suspend():AC.resume()});
 // ---------- Estado ----------
 const cv=document.getElementById('cv'),g=cv.getContext('2d');cv.width=W*2;cv.height=H*2;
 let sel=0,state='menu',mode='ground',ys=0,vy=0,lastRise=0,ph=0,ang=0,grabT=0,grabName='',airT=0,maxY=0,buf=0,bailT=0,tilt=0,hs=0,hg=0,hj=0;
